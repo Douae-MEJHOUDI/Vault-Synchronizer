@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra
-LDFLAGS = -lstdc++fs -lcrypto
+LDFLAGS = -lstdc++fs -lcrypto -ljsoncpp
 
 # Source files
 SRCS = VaultManager.cpp test_version_control.cpp

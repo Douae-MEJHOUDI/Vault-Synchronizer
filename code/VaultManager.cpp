@@ -4,9 +4,10 @@
 #include <openssl/evp.h>
 #include <ctime>
 #include <iostream>
+#include <jsoncpp/json/json.h>
 
 VaultManager::VaultManager(const std::string& basePath) : vaultPath(basePath) {}
-
+ 
 bool VaultManager::createConfigFile() {
     try {
         fs::path configPath = fs::path(vaultPath) / VAULT_DIR / CONFIG_FILE;
@@ -62,22 +63,31 @@ bool VaultManager::initializeVault() {
         }
 
         // Create main vault directory and subdirectories
-        fs::create_directories(fs::path(vaultPath) / VAULT_DIR / OBJECTS_DIR);
-        fs::create_directories(fs::path(vaultPath) / VAULT_DIR / COMMITS_DIR);
-        fs::create_directories(fs::path(vaultPath) / VAULT_DIR / BRANCHES_DIR);
+        if (!createVaultDirectory()) {
+            throw std::runtime_error("Failed to create vault directories");
+        }
 
         // Create configuration file
         if (!createConfigFile()) {
             throw std::runtime_error("Failed to create configuration file");
         }
 
-        // Create master branch
+        // Initialize master branch
         currentBranch = "master";
-        createBranch(currentBranch);
+        if (!createBranch(currentBranch)) {
+            throw std::runtime_error("Failed to create master branch");
+        }
+
+        // Save initial branch state
+        std::map<std::string, std::string> emptyState;
+        if (!saveBranchState(currentBranch, emptyState)) {
+            throw std::runtime_error("Failed to save initial branch state");
+        }
 
         return true;
     }
     catch (const std::exception& e) {
+        std::cerr << "Error initializing vault: " << e.what() << std::endl;
         return false;
     }
 }
@@ -205,13 +215,165 @@ std::vector<std::string> VaultManager::listBranches() const {
 }
 
 bool VaultManager::switchBranch(const std::string& branchName) {
-    // For now, just check if branch exists
-    fs::path branchPath = fs::path(vaultPath) / VAULT_DIR / BRANCHES_DIR / branchName;
-    if (!fs::exists(branchPath)) {
+    try {
+        fs::path branchPath = fs::path(vaultPath) / VAULT_DIR / BRANCHES_DIR / branchName;
+        if (!fs::exists(branchPath)) {
+            throw std::runtime_error("Branch does not exist: " + branchName);
+        }
+
+        // Get current branch's latest commit
+        fs::path currentHeadPath = fs::path(vaultPath) / VAULT_DIR / BRANCHES_DIR / currentBranch / "HEAD";
+        std::string currentCommitId;
+        if (fs::exists(currentHeadPath)) {
+            std::ifstream headFile(currentHeadPath);
+            std::getline(headFile, currentCommitId);
+        }
+
+        // Save current files state before switch
+        if (!currentCommitId.empty()) {
+            fs::path commitPath = fs::path(vaultPath) / VAULT_DIR / COMMITS_DIR / currentCommitId / "metadata.json";
+            if (fs::exists(commitPath)) {
+                std::ifstream metaFile(commitPath);
+                Json::Value root;
+                Json::CharReaderBuilder reader;
+                JSONCPP_STRING errs;
+                if (!Json::parseFromStream(reader, metaFile, &root, &errs)) {
+                    throw std::runtime_error("Failed to parse commit metadata: " + errs);
+                }
+                
+                auto fileStates = getBranchState(currentBranch);
+                saveBranchState(currentBranch, fileStates);
+            }
+        }
+
+        // Get target branch's latest commit
+        fs::path targetHeadPath = fs::path(vaultPath) / VAULT_DIR / BRANCHES_DIR / branchName / "HEAD";
+        std::string targetCommitId;
+        if (fs::exists(targetHeadPath)) {
+            std::ifstream headFile(targetHeadPath);
+            std::getline(headFile, targetCommitId);
+        }
+
+        // Restore files from target branch's latest commit
+        if (!targetCommitId.empty()) {
+            fs::path commitPath = fs::path(vaultPath) / VAULT_DIR / COMMITS_DIR / targetCommitId / "metadata.json";
+            if (fs::exists(commitPath)) {
+                std::ifstream metaFile(commitPath);
+                Json::Value root;
+                Json::CharReaderBuilder reader;
+                JSONCPP_STRING errs;
+                if (!Json::parseFromStream(reader, metaFile, &root, &errs)) {
+                    throw std::runtime_error("Failed to parse commit metadata: " + errs);
+                }
+
+                const Json::Value& files = root["files"];
+                for (auto it = files.begin(); it != files.end(); ++it) {
+                    std::string filePath = it.key().asString();
+                    std::string fileHash = (*it).asString();
+                    copyFileFromObjects(fileHash, filePath);
+                }
+            }
+        }
+
+        currentBranch = branchName;
+        return true;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error switching branch: " << e.what() << std::endl;
         return false;
     }
-    currentBranch = branchName;
-    return true;
+}
+
+bool VaultManager::saveBranchState(const std::string& branchName, 
+                                 const std::map<std::string, std::string>& fileStates) {
+    try {
+        fs::path statePath = fs::path(vaultPath) / VAULT_DIR / BRANCHES_DIR / branchName / "state.json";
+        std::ofstream stateFile(statePath);
+        if (!stateFile.is_open()) {
+            return false;
+        }
+
+        // Write state to JSON
+        stateFile << "{\n  \"files\": {\n";
+        bool first = true;
+        for (const auto& [file, hash] : fileStates) {
+            if (!first) stateFile << ",\n";
+            stateFile << "    \"" << file << "\": \"" << hash << "\"";
+            first = false;
+        }
+        stateFile << "\n  }\n}";
+        return true;
+    }
+    catch (...) {
+        return false;
+    }
+}
+
+std::map<std::string, std::string> VaultManager::getBranchState(const std::string& branchName) {
+    std::map<std::string, std::string> state;
+    fs::path statePath = fs::path(vaultPath) / VAULT_DIR / BRANCHES_DIR / branchName / "state.json";
+    
+    if (fs::exists(statePath)) {
+        std::ifstream stateFile(statePath);
+        std::string content((std::istreambuf_iterator<char>(stateFile)),
+                           std::istreambuf_iterator<char>());
+        
+
+    }
+    
+    return state;
+}
+
+bool VaultManager::copyFileFromObjects(const std::string& hash, const std::string& destPath) {
+    try {
+        fs::path sourcePath = fs::path(vaultPath) / VAULT_DIR / OBJECTS_DIR / hash;
+        if (!fs::exists(sourcePath)) {
+            return false;
+        }
+        
+        fs::copy_file(sourcePath, destPath, fs::copy_options::overwrite_existing);
+        return true;
+    }
+    catch (...) {
+        return false;
+    }
+}
+
+bool VaultManager::checkoutFile(const std::string& filePath, const std::string& commitId) {
+    try {
+        fs::path commitPath = fs::path(vaultPath) / VAULT_DIR / COMMITS_DIR / commitId / "metadata.json";
+        if (!fs::exists(commitPath)) {
+            throw std::runtime_error("Commit does not exist: " + commitId);
+        }
+
+        // Read commit metadata and restore file
+        // In practice, you'd parse the JSON and get the file hash
+        // Then use copyFileFromObjects to restore it
+        
+        return true;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error checking out file: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+bool VaultManager::restoreFiles(const std::map<std::string, std::string>& fileStates) {
+    try {
+        for (const auto& [file, hash] : fileStates) {
+            if (!copyFileFromObjects(hash, file)) {
+                throw std::runtime_error("Failed to restore file: " + file);
+            }
+        }
+        return true;
+    }
+    catch (...) {
+        return false;
+    }
+}
+
+std::string VaultManager::getCurrentBranch() const {
+    return currentBranch;
 }
 
 std::vector<FileVersion> VaultManager::getFileHistory(const std::string& filePath) {
@@ -247,6 +409,11 @@ bool VaultManager::commit(const std::string& message) {
             throw std::runtime_error("Failed to update branch head");
         }
 
+        // Save branch state
+        if (!saveBranchState(currentBranch, commit.fileHashes)) {
+            throw std::runtime_error("Failed to save branch state");
+        }
+
         // Clear staged files
         stagedFiles.clear();
 
@@ -273,31 +440,33 @@ bool VaultManager::saveCommitInfo(const CommitInfo& commit) {
         fs::path commitPath = fs::path(vaultPath) / VAULT_DIR / COMMITS_DIR / commit.commitId;
         fs::create_directories(commitPath);
 
-        // Save commit metadata
+        // Create JSON object
+        Json::Value root;
+        root["commit_id"] = commit.commitId;
+        root["message"] = commit.message;
+        root["timestamp"] = Json::Value::Int64(commit.timestamp);
+        
+        Json::Value files;
+        for (const auto& [file, hash] : commit.fileHashes) {
+            files[file] = hash;
+        }
+        root["files"] = files;
+
+        // Write to file
         std::ofstream metaFile(commitPath / "metadata.json");
         if (!metaFile.is_open()) {
             return false;
         }
 
-        metaFile << "{\n";
-        metaFile << "  \"commit_id\": \"" << commit.commitId << "\",\n";
-        metaFile << "  \"message\": \"" << commit.message << "\",\n";
-        metaFile << "  \"timestamp\": " << commit.timestamp << ",\n";
-        metaFile << "  \"files\": {\n";
-        
-        bool first = true;
-        for (const auto& [file, hash] : commit.fileHashes) {
-            if (!first) metaFile << ",\n";
-            metaFile << "    \"" << file << "\": \"" << hash << "\"";
-            first = false;
-        }
-        
-        metaFile << "\n  }\n}\n";
+        Json::StreamWriterBuilder writer;
+        std::string jsonString = Json::writeString(writer, root);
+        metaFile << jsonString;
         metaFile.close();
 
         return true;
     }
     catch (const std::exception& e) {
+        std::cerr << "Error saving commit info: " << e.what() << std::endl;
         return false;
     }
 }

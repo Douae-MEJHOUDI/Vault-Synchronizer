@@ -11,7 +11,7 @@
 #include <iostream>
 
 namespace fs = std::filesystem;
-
+ 
 struct FileVersion {
     std::string hash;        // Hash of file content
     std::string timestamp;   // When this version was created
@@ -30,6 +30,8 @@ private:
     std::string currentBranch;
     std::vector<std::string> stagedFiles;  // List of files ready to be committed
 
+
+
     struct CommitInfo {
         std::string commitId;
         std::string message;
@@ -45,6 +47,10 @@ private:
     std::string createCommitId();
     bool saveCommitInfo(const CommitInfo& commit);
     bool updateBranchHead(const std::string& branchName, const std::string& commitId);
+    bool saveBranchState(const std::string& branchName, const std::map<std::string, std::string>& fileStates);
+    std::map<std::string, std::string> getBranchState(const std::string& branchName);
+    bool restoreFiles(const std::map<std::string, std::string>& fileStates);
+    bool copyFileFromObjects(const std::string& hash, const std::string& destPath);
     
 public:
     VaultManager(const std::string& basePath);
@@ -61,6 +67,8 @@ public:
     bool switchBranch(const std::string& branchName);            // Switch to branch
     std::vector<std::string> listBranches() const;               // List all branches
     std::vector<FileVersion> getFileHistory(const std::string& filePath); // Get file history
+    std::string getCurrentBranch() const;
+    bool checkoutFile(const std::string& filePath, const std::string& commitId);
 };
 
 #endif // VAULT_MANAGER_HPP
