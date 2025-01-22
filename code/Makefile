@@ -1,27 +1,45 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra
-LDFLAGS = -lstdc++fs -lcrypto -ljsoncpp
+LDFLAGS = -lcrypto -ljsoncpp
 
 # Source files
-SRCS = VaultManager.cpp test_version_control.cpp
-# Object files (automatically generated from source files)
-OBJS = $(SRCS:.cpp=.o)
-# Final executable name
-TARGET = test_version
+SOURCES = VaultManager.cpp \
+          FileManager.cpp \
+          BranchManager.cpp \
+          CommitManager.cpp \
+          test_vault.cpp
+
+# Object files
+OBJECTS = $(SOURCES:.cpp=.o)
+
+# Executable name
+TARGET = vault_test
 
 # Default target
 all: $(TARGET)
 
-# Linking rule
-$(TARGET): $(OBJS)
-	$(CXX) $(OBJS) -o $(TARGET) $(LDFLAGS)
+# Linking
+$(TARGET): $(OBJECTS)
+	$(CXX) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
 
-# Compilation rule
+# Compilation
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Clean rule
-clean:
-	rm -f $(OBJS) $(TARGET)
+# Dependencies
+VaultManager.o: VaultManager.cpp VaultManager.hpp
+FileManager.o: FileManager.cpp FileManager.hpp
+BranchManager.o: BranchManager.cpp BranchManager.hpp
+CommitManager.o: CommitManager.cpp CommitManager.hpp
+test_vault.o: test_vault.cpp VaultManager.hpp
 
-.PHONY: all clean
+# Clean
+clean:
+	rm -f $(OBJECTS) $(TARGET)
+	rm -rf test_vault
+
+# Run tests
+test: $(TARGET)
+	./$(TARGET)
+
+.PHONY: all clean test
