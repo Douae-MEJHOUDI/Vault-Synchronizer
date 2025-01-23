@@ -84,7 +84,11 @@ bool CommitManager::commit(const std::string& message) {
             if (!fileManager.storeFileContent(file, hash)) {
                 throw std::runtime_error("Failed to store file content: " + file);
             }
-            commit.fileHashes[file] = hash;
+            
+            // Store relative path in commit
+            fs::path filePath(file);
+            std::string relativePath = filePath.filename().string();
+            commit.fileHashes[relativePath] = hash;
         }
 
         // Save commit information
@@ -95,12 +99,11 @@ bool CommitManager::commit(const std::string& message) {
         // Update branch state and HEAD
         std::string currentBranch = branchManager.getCurrentBranch();
         
-        // Update the branch state
+        // Update the branch state with relative paths
         if (!branchManager.saveBranchState(currentBranch, commit.fileHashes)) {
             throw std::runtime_error("Failed to update branch state");
         }
 
-        // IMPORTANT: Always update HEAD after a commit
         if (!branchManager.switchBranch(currentBranch, commit.commitId)) {
             throw std::runtime_error("Failed to update branch HEAD");
         }
@@ -116,7 +119,6 @@ bool CommitManager::commit(const std::string& message) {
         return false;
     }
 }
-
 std::vector<FileVersion> CommitManager::getFileHistory(const std::string& filePath) {
     std::vector<FileVersion> history;
     fs::path commitsDir = fs::path(vaultPath) / COMMITS_DIR;

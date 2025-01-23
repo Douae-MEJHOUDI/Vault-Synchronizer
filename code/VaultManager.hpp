@@ -4,6 +4,7 @@
 #include "FileManager.hpp"
 #include "BranchManager.hpp"
 #include "CommitManager.hpp"
+#include "SyncManager.hpp"
 #include <memory>
 
 class VaultManager {
@@ -18,6 +19,7 @@ private:
     std::unique_ptr<FileManager> fileManager;
     std::unique_ptr<BranchManager> branchManager;
     std::unique_ptr<CommitManager> commitManager;
+    std::unique_ptr<SyncManager> syncManager;
 
     bool createVaultDirectory();
     bool createConfigFile();
@@ -44,6 +46,16 @@ public:
     std::vector<FileVersion> getFileHistory(const std::string& filePath);
     std::string getCurrentBranch() const;
     bool checkoutFile(const std::string& filePath, const std::string& commitId);
+
+    // Synchronization operations
+    bool initializeSync(const std::string& source, const std::string& dest);
+    bool synchronize();
+    std::vector<std::string> getModifiedFiles();
+    std::vector<std::string> getConflictingFiles();
+    bool synchronizeFile(const std::string& filePath);
+    bool resolveConflict(const std::string& filePath, bool useSource);
+
+
 };
 
-#endif // VAULT_MANAGER_HPP
+#endif 

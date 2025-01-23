@@ -1,45 +1,47 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra
-LDFLAGS = -lcrypto -ljsoncpp
+CXXFLAGS = -std=c++17 -Wall -Wextra -I.
+LDFLAGS = -ljsoncpp -lcrypto
 
 # Source files
-SOURCES = VaultManager.cpp \
-          FileManager.cpp \
+SOURCES = FileManager.cpp \
           BranchManager.cpp \
           CommitManager.cpp \
-          test_vault.cpp
+          SyncManager.cpp \
+          VaultManager.cpp \
+          test_sync.cpp
 
 # Object files
 OBJECTS = $(SOURCES:.cpp=.o)
 
 # Executable name
-TARGET = vault_test
+EXECUTABLE = test_sync
 
-# Default target
-all: $(TARGET)
+# Main target
+all: $(EXECUTABLE)
 
 # Linking
-$(TARGET): $(OBJECTS)
-	$(CXX) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
+$(EXECUTABLE): $(OBJECTS)
+	$(CXX) $(OBJECTS) -o $(EXECUTABLE) $(LDFLAGS)
 
 # Compilation
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Dependencies
-VaultManager.o: VaultManager.cpp VaultManager.hpp
 FileManager.o: FileManager.cpp FileManager.hpp
-BranchManager.o: BranchManager.cpp BranchManager.hpp
-CommitManager.o: CommitManager.cpp CommitManager.hpp
-test_vault.o: test_vault.cpp VaultManager.hpp
+BranchManager.o: BranchManager.cpp BranchManager.hpp FileManager.hpp
+CommitManager.o: CommitManager.cpp CommitManager.hpp FileManager.hpp BranchManager.hpp
+SyncManager.o: SyncManager.cpp SyncManager.hpp FileManager.hpp CommitManager.hpp
+VaultManager.o: VaultManager.cpp VaultManager.hpp FileManager.hpp BranchManager.hpp CommitManager.hpp SyncManager.hpp
+test_sync.o: test_sync.cpp VaultManager.hpp
 
 # Clean
 clean:
-	rm -f $(OBJECTS) $(TARGET)
-	rm -rf test_vault
+	rm -f $(OBJECTS) $(EXECUTABLE)
+	rm -rf source_dir dest_dir .vault
 
 # Run tests
-test: $(TARGET)
-	./$(TARGET)
+test: $(EXECUTABLE)
+	./$(EXECUTABLE)
 
 .PHONY: all clean test

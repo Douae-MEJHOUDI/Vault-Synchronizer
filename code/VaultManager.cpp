@@ -20,6 +20,11 @@ VaultManager::VaultManager(const std::string& basePath) : vaultPath(basePath) {
         *fileManager,
         *branchManager
     );
+
+    syncManager = std::make_unique<SyncManager>(
+        *fileManager,
+        *commitManager
+    );
 }
 
 bool VaultManager::createVaultDirectory() {
@@ -96,6 +101,7 @@ std::string VaultManager::getVaultPath() const {
     return vaultPath;
 }
 
+// Version control operations
 bool VaultManager::addFile(const std::string& filePath) {
     return commitManager->stageFile(filePath);
 }
@@ -109,7 +115,7 @@ bool VaultManager::createBranch(const std::string& branchName) {
 }
 
 bool VaultManager::switchBranch(const std::string& branchName) {
-    return branchManager->switchBranch(branchName, "");  // Empty commit ID for now
+    return branchManager->switchBranch(branchName, "");
 }
 
 std::vector<std::string> VaultManager::listBranches() const {
@@ -126,4 +132,29 @@ std::string VaultManager::getCurrentBranch() const {
 
 bool VaultManager::checkoutFile(const std::string& filePath, const std::string& commitId) {
     return commitManager->checkoutFile(filePath, commitId);
+}
+
+// Synchronization operations
+bool VaultManager::initializeSync(const std::string& source, const std::string& dest) {
+    return syncManager->initializeSync(source, dest);
+}
+
+bool VaultManager::synchronize() {
+    return syncManager->synchronize();
+}
+
+std::vector<std::string> VaultManager::getModifiedFiles() {
+    return syncManager->getModifiedFiles();
+}
+
+std::vector<std::string> VaultManager::getConflictingFiles() {
+    return syncManager->getConflictingFiles();
+}
+
+bool VaultManager::synchronizeFile(const std::string& filePath) {
+    return syncManager->synchronizeSpecificFile(filePath);
+}
+
+bool VaultManager::resolveConflict(const std::string& filePath, bool useSource) {
+    return syncManager->resolveConflict(filePath, useSource);
 }
