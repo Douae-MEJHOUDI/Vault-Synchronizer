@@ -1,6 +1,6 @@
 # Vault-Synchronizer
 
--------------------------------------------------------------------------------------In the PrivilegeManager:
+# -------------------------------------------------------------------------------------In the PrivilegeManager:
 
 Constructor:
 - Initializes vault path and loads users
@@ -53,7 +53,7 @@ Constructor:
 `logout()`:
 - Clears current user session
 
-  -----------------------------------------------------------------------------------------------------The RollbackManager's key functions:
+# -----------------------------------------------------------------------------------------------------The RollbackManager's key functions:
 
 `getCurrentCommitState()`:
 - Creates snapshot of current working directory
@@ -101,8 +101,8 @@ Constructor:
 - Saves commit for potential rollforward
 - Requires write permissions
 
-  ----------------------------------------------------------------------------------------------The test file validates two main components:
-testPrivilegeManagement():
+# ----------------------------------------------------------------------------------------------The test file validates two main components:
+`testPrivilegeManagement()`:
 
 Validates user roles (admin, reader, writer)
 Tests permission enforcement:
@@ -113,7 +113,7 @@ Admin has full access
 
 
 
-testRollbackFunctionality():
+`testRollbackFunctionality()`:
 
 Creates three file versions with delays
 Tests version control operations:
