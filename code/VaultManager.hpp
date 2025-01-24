@@ -4,6 +4,7 @@
 #include "FileManager.hpp"
 #include "BranchManager.hpp"
 #include "CommitManager.hpp"
+#include "PrivilegeManager.hpp"
 #include <memory>
 
 class VaultManager {
@@ -15,6 +16,7 @@ private:
     const std::string COMMITS_DIR = "commits";
     const std::string BRANCHES_DIR = "branches";
 
+    std::unique_ptr<PrivilegeManager> privilegeManager;
     std::unique_ptr<FileManager> fileManager;
     std::unique_ptr<BranchManager> branchManager;
     std::unique_ptr<CommitManager> commitManager;

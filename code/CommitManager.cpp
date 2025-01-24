@@ -3,10 +3,13 @@
 #include <iomanip>
 #include <iostream>
 #include <algorithm>
-#include <jsoncpp/json/json.h>
+#include "json/json.h"
 #include <filesystem>
 #include <chrono>
 #include <random>
+#include <cstdlib>
+#include <ctime>
+
 
 std::string CommitManager::createCommitId() {
     auto now = std::chrono::system_clock::now();
@@ -55,6 +58,10 @@ bool CommitManager::saveCommitInfo(const CommitInfo& commit) {
 }
 
 bool CommitManager::stageFile(const std::string& filePath) {
+    if (!privilegeManager.isAuthorized("write")) {
+            std::cerr << "Error: User does not have write permissions to stage files" << std::endl;
+            return false;
+        }
     if (!fileManager.fileExists(filePath)) {
         std::cerr << "File does not exist: " << filePath << std::endl;
         return false;
@@ -66,6 +73,10 @@ bool CommitManager::stageFile(const std::string& filePath) {
 }
 
 bool CommitManager::commit(const std::string& message) {
+    if (!privilegeManager.isAuthorized("write")) { //ADDED privilege checks
+            std::cerr << "Error: User does not have write permissions to commit" << std::endl;
+            return false;
+        }
     try {
         if (stagedFiles.empty()) {
             std::cerr << "No files staged for commit" << std::endl;
@@ -76,7 +87,11 @@ bool CommitManager::commit(const std::string& message) {
         CommitInfo commit;
         commit.commitId = createCommitId();
         commit.message = message;
-        commit.timestamp = std::time(nullptr);
+        auto now = std::chrono::system_clock::now();
+        commit.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()
+        ).count(); 
+        
 
         // Process each staged file
         for (const auto& file : stagedFiles) {
@@ -118,6 +133,10 @@ bool CommitManager::commit(const std::string& message) {
 }
 
 std::vector<FileVersion> CommitManager::getFileHistory(const std::string& filePath) {
+    if (!privilegeManager.isAuthorized("read")) {
+            std::cerr << "Error: User does not have read permissions to view file history" << std::endl;
+            return {};
+        }
     std::vector<FileVersion> history;
     fs::path commitsDir = fs::path(vaultPath) / COMMITS_DIR;
     
@@ -159,6 +178,11 @@ std::vector<FileVersion> CommitManager::getFileHistory(const std::string& filePa
 }
 
 bool CommitManager::checkoutFile(const std::string& filePath, const std::string& commitId) {
+    if (!privilegeManager.isAuthorized("read")) {
+            std::cerr << "Error: User does not have read permissions to checkout files" << std::endl;
+            return false;
+        }
+    
     try {
         fs::path commitPath = fs::path(vaultPath) / COMMITS_DIR / commitId / "metadata.json";
         if (!fs::exists(commitPath)) {
@@ -193,5 +217,12 @@ bool CommitManager::checkoutFile(const std::string& filePath, const std::string&
 }
 
 std::vector<std::string> CommitManager::getStagedFiles() const {
+    if (!privilegeManager.isAuthorized("read")) {
+            std::cerr << "Error: User does not have read permissions to view staged files" << std::endl;
+            return {};
+        }
     return stagedFiles;
 }
+
+std::string CommitManager::getVaultPath() const { return vaultPath; }
+std::string CommitManager::getCommitsDir() const { return COMMITS_DIR; }

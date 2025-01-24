@@ -1,13 +1,23 @@
+# Compiler settings
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra
-LDFLAGS = -lcrypto -ljsoncpp
+CXXFLAGS = -std=c++17 -Wall -Wextra -D_WIN32_WINNT=0x0601
+
+# Library and include paths (adjust these based on your MSYS2 installation)
+INCLUDE_PATHS = -IC:/msys64/ucrt64/include \
+                -IC:/msys64/ucrt64/include/jsoncpp
+LIBRARY_PATHS = -LC:/msys64/ucrt64/lib
+
+# Libraries
+LDFLAGS = -lcrypto -lssl -ljsoncpp
 
 # Source files
 SOURCES = VaultManager.cpp \
           FileManager.cpp \
           BranchManager.cpp \
           CommitManager.cpp \
-          test_vault.cpp
+          PrivilegeManager.cpp \
+          RollBackManager.cpp \
+          test_milestones45.cpp
 
 # Object files
 OBJECTS = $(SOURCES:.cpp=.o)
@@ -20,23 +30,16 @@ all: $(TARGET)
 
 # Linking
 $(TARGET): $(OBJECTS)
-	$(CXX) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
+	$(CXX) $(OBJECTS) -o $(TARGET) $(LIBRARY_PATHS) $(LDFLAGS)
 
 # Compilation
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
-# Dependencies
-VaultManager.o: VaultManager.cpp VaultManager.hpp
-FileManager.o: FileManager.cpp FileManager.hpp
-BranchManager.o: BranchManager.cpp BranchManager.hpp
-CommitManager.o: CommitManager.cpp CommitManager.hpp
-test_vault.o: test_vault.cpp VaultManager.hpp
+	$(CXX) $(CXXFLAGS) $(INCLUDE_PATHS) -c $< -o $@
 
 # Clean
 clean:
-	rm -f $(OBJECTS) $(TARGET)
-	rm -rf test_vault
+	del /F /Q $(OBJECTS) $(TARGET).exe 2>nul
+	if exist test_vault rmdir /S /Q test_milestones45
 
 # Run tests
 test: $(TARGET)

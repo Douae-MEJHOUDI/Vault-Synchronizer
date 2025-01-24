@@ -1,24 +1,32 @@
 #include "VaultManager.hpp"
 #include <iostream>
-#include <jsoncpp/json/json.h>
+#include "json/json.h"
 
+// VaultManager constructor
 VaultManager::VaultManager(const std::string& basePath) : vaultPath(basePath) {
+    privilegeManager = std::make_unique<PrivilegeManager>(
+        (fs::path(basePath) / VAULT_DIR).string()
+    );
+
     fileManager = std::make_unique<FileManager>(
-        fs::path(basePath) / VAULT_DIR,
-        OBJECTS_DIR
+        (fs::path(basePath) / VAULT_DIR).string(),
+        OBJECTS_DIR,
+        *privilegeManager  // Pass the PrivilegeManager
     );
-    
+
     branchManager = std::make_unique<BranchManager>(
-        fs::path(basePath) / VAULT_DIR,
+        (fs::path(basePath) / VAULT_DIR).string(),
         BRANCHES_DIR,
-        *fileManager
+        *fileManager,
+        *privilegeManager  // Pass the PrivilegeManager
     );
-    
+
     commitManager = std::make_unique<CommitManager>(
-        fs::path(basePath) / VAULT_DIR,
+        (fs::path(basePath) / VAULT_DIR).string(),
         COMMITS_DIR,
         *fileManager,
-        *branchManager
+        *branchManager,
+        *privilegeManager  // Pass the PrivilegeManager
     );
 }
 

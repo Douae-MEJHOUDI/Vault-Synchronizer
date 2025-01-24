@@ -2,8 +2,15 @@
 #include <sstream>
 #include <iomanip>
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
+
 
 bool FileManager::fileExists(const std::string& filePath) const {
+    if (!privilegeManager.isAuthorized("read")) {
+            std::cerr << "Error: User does not have read permissions to check files" << std::endl;
+            return false;
+        }
     return fs::exists(filePath);
 }
 
@@ -12,6 +19,9 @@ std::string FileManager::getObjectPath(const std::string& hash) const {
 }
 
 std::string FileManager::calculateFileHash(const std::string& filePath) {
+    if (!privilegeManager.isAuthorized("read")) {
+            throw std::runtime_error("Error: User does not have read permissions to calculate hash");
+        }
     std::ifstream file(filePath, std::ios::binary);
     if (!file) {
         throw std::runtime_error("Cannot open file: " + filePath);
@@ -53,6 +63,10 @@ std::string FileManager::calculateFileHash(const std::string& filePath) {
 }
 
 bool FileManager::storeFileContent(const std::string& filePath, const std::string& hash) {
+    if (!privilegeManager.isAuthorized("write")) {
+            std::cerr << "Error: User does not have write permissions to store files" << std::endl;
+            return false;
+        }
     try {
         std::string objectPath = getObjectPath(hash);
 
@@ -70,6 +84,10 @@ bool FileManager::storeFileContent(const std::string& filePath, const std::strin
 }
 
 bool FileManager::copyFileFromObjects(const std::string& hash, const std::string& destPath) {
+    if (!privilegeManager.isAuthorized("read")) {
+            std::cerr << "Error: User does not have read permissions to copy files" << std::endl;
+            return false;
+        }
     try {
         std::string sourcePath = getObjectPath(hash);
         if (!fileExists(sourcePath)) {

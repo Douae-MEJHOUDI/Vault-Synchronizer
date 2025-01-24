@@ -6,6 +6,10 @@
 #include <fstream>
 #include <vector>
 #include <openssl/evp.h>
+#include <cstdlib>
+#include <ctime>
+#include "PrivilegeManager.hpp"
+
 
 namespace fs = std::filesystem;
 
@@ -13,10 +17,11 @@ class FileManager {
 private:
     std::string vaultPath;
     const std::string OBJECTS_DIR;
+    PrivilegeManager& privilegeManager;
 
 public:
-    FileManager(const std::string& basePath, const std::string& objectsDir) 
-        : vaultPath(basePath), OBJECTS_DIR(objectsDir) {}
+    FileManager(const std::string& basePath, const std::string& objectsDir, PrivilegeManager& pm) 
+        : vaultPath(basePath), OBJECTS_DIR(objectsDir), privilegeManager(pm) {}
 
     // Core file operations
     std::string calculateFileHash(const std::string& filePath);

@@ -1,22 +1,41 @@
 #include "BranchManager.hpp"
-#include <jsoncpp/json/json.h>
 #include <iostream>
+#include "json/json.h"
+
+bool BranchManager::updateBranchHead(const std::string& branchName, const std::string& commitId) {
+    if (!privilegeManager.isAuthorized("write")) {
+        std::cerr << "Error: User does not have write permissions for branch operations" << std::endl;
+        return false;
+    }
+    try {
+        fs::path headPath = fs::path(vaultPath) / BRANCHES_DIR / branchName / "HEAD";
+        fs::create_directories(fs::path(vaultPath) / BRANCHES_DIR / branchName);
+        std::ofstream headFile(headPath);
+        if (!headFile.is_open()) {
+            throw std::runtime_error("Could not open HEAD file for writing");
+        }
+        headFile << commitId;
+        return true;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error updating branch HEAD: " << e.what() << std::endl;
+        return false;
+    }
+}
 
 bool BranchManager::createBranch(const std::string& branchName) {
+    if (!privilegeManager.isAuthorized("write")) {
+        std::cerr << "Error: User does not have write permissions to create branches" << std::endl;
+        return false;
+    }
     try {
         fs::path branchPath = fs::path(vaultPath) / BRANCHES_DIR / branchName;
         if (fs::exists(branchPath)) {
             throw std::runtime_error("Branch already exists: " + branchName);
         }
-
         fs::create_directories(branchPath);
-
         std::map<std::string, std::string> emptyState;
-        if (!saveBranchState(branchName, emptyState)) {
-            throw std::runtime_error("Failed to save initial branch state");
-        }
-
-        return true;
+        return saveBranchState(branchName, emptyState);
     }
     catch (const std::exception& e) {
         std::cerr << "Error creating branch: " << e.what() << std::endl;
@@ -24,64 +43,61 @@ bool BranchManager::createBranch(const std::string& branchName) {
     }
 }
 
-bool BranchManager::switchBranch(const std::string& branchName, const std::string& commitId) {
-    try {
-        fs::path branchPath = fs::path(vaultPath) / BRANCHES_DIR / branchName;
-        if (!fs::exists(branchPath)) {
-            throw std::runtime_error("Branch does not exist: " + branchName);
+    bool BranchManager::switchBranch(const std::string& branchName, const std::string& commitId = "") {
+        if (!privilegeManager.isAuthorized("write")) {
+            std::cerr << "Error: User does not have write permissions to switch branches" << std::endl;
+            return false;
         }
-
-        // Always update HEAD if a commitId is provided
-        if (!commitId.empty()) {
-            if (!updateBranchHead(branchName, commitId)) {
+        try {
+            fs::path branchPath = fs::path(vaultPath) / BRANCHES_DIR / branchName;
+            if (!fs::exists(branchPath)) {
+                throw std::runtime_error("Branch does not exist: " + branchName);
+            }
+            if (!commitId.empty() && !updateBranchHead(branchName, commitId)) {
                 throw std::runtime_error("Failed to update branch HEAD");
             }
+            currentBranch = branchName;
+            return true;
         }
-
-        // Update current branch
-        currentBranch = branchName;
-        
-        std::cout << "Switched to branch " << branchName;
-        if (!commitId.empty()) {
-            std::cout << " at commit " << commitId;
+        catch (const std::exception& e) {
+            std::cerr << "Error switching branch: " << e.what() << std::endl;
+            return false;
         }
-        std::cout << std::endl;
+    }
 
-        return true;
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Error switching branch: " << e.what() << std::endl;
-        return false;
-    }
-}
-std::vector<std::string> BranchManager::listBranches() const {
-    std::vector<std::string> branches;
-    fs::path branchesPath = fs::path(vaultPath) / BRANCHES_DIR;
-    
-    try {
-        for (const auto& entry : fs::directory_iterator(branchesPath)) {
-            if (entry.is_directory()) {
-                branches.push_back(entry.path().filename().string());
+    std::vector<std::string> BranchManager::listBranches() const {
+        if (!privilegeManager.isAuthorized("read")) {
+            std::cerr << "Error: User does not have read permissions to list branches" << std::endl;
+            return {};
+        }
+        std::vector<std::string> branches;
+        try {
+            fs::path branchesPath = fs::path(vaultPath) / BRANCHES_DIR;
+            for (const auto& entry : fs::directory_iterator(branchesPath)) {
+                if (entry.is_directory()) {
+                    branches.push_back(entry.path().filename().string());
+                }
             }
         }
+        catch (const std::exception& e) {
+            std::cerr << "Error listing branches: " << e.what() << std::endl;
+        }
+        return branches;
     }
-    catch (const std::exception& e) {
-        std::cerr << "Error listing branches: " << e.what() << std::endl;
+
+    std::string BranchManager::getCurrentBranch() const {
+        if (!privilegeManager.isAuthorized("read")) {
+            std::cerr << "Error: User does not have read permissions" << std::endl;
+            return "";
+        }
+        return currentBranch;
     }
-    
-    return branches;
-}
 
-std::string BranchManager::getCurrentBranch() const {
-    return currentBranch;
-}
-
-bool BranchManager::branchExists(const std::string& branchName) const {
-    return fs::exists(fs::path(vaultPath) / BRANCHES_DIR / branchName);
-}
-
-bool BranchManager::saveBranchState(const std::string& branchName, 
-                                  const std::map<std::string, std::string>& fileStates) {
+    bool BranchManager::saveBranchState(const std::string& branchName, const std::map<std::string, std::string>& fileStates) {
+        if (!privilegeManager.isAuthorized("write")) {
+            std::cerr << "Error: User does not have write permissions to save branch state" << std::endl;
+            return false;
+        }
     try {
         fs::path statePath = fs::path(vaultPath) / BRANCHES_DIR / branchName / "state.json";
         
@@ -113,6 +129,10 @@ bool BranchManager::saveBranchState(const std::string& branchName,
 }
 
 std::map<std::string, std::string> BranchManager::getBranchState(const std::string& branchName) {
+    if (!privilegeManager.isAuthorized("read")) {
+            std::cerr << "Error: User does not have read permissions to get branch state" << std::endl;
+            return {};
+        }
     std::map<std::string, std::string> state;
     fs::path statePath = fs::path(vaultPath) / BRANCHES_DIR / branchName / "state.json";
     
@@ -140,25 +160,3 @@ std::map<std::string, std::string> BranchManager::getBranchState(const std::stri
     return state;
 }
 
-bool BranchManager::updateBranchHead(const std::string& branchName, const std::string& commitId) {
-    try {
-        fs::path headPath = fs::path(vaultPath) / BRANCHES_DIR / branchName / "HEAD";
-
-        fs::create_directories(fs::path(vaultPath) / BRANCHES_DIR / branchName);
-        
-        std::ofstream headFile(headPath);
-        if (!headFile.is_open()) {
-            throw std::runtime_error("Could not open HEAD file for writing");
-        }
-
-        headFile << commitId;
-        headFile.close();
-        
-        std::cout << "Updated " << branchName << " HEAD to " << commitId << std::endl;
-        return true;
-    }
-    catch (const std::exception& e) {
-        std::cerr << "Error updating branch HEAD: " << e.what() << std::endl;
-        return false;
-    }
-}
