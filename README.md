@@ -104,24 +104,24 @@ Constructor:
 # ------The test file validates two main components:
 `testPrivilegeManagement()`:
 
-Validates user roles (admin, reader, writer)
-Tests permission enforcement:
+- Validates user roles (admin, reader, writer)
+- Tests permission enforcement:
 
-Reader can't stage/commit files
-Writer can stage/commit files
-Admin has full access
+- Reader can't stage/commit files
+- Writer can stage/commit files
+- Admin has full access
 
 
 
 `testRollbackFunctionality()`:
 
-Creates three file versions with delays
-Tests version control operations:
+- Creates three file versions with delays
+- Tests version control operations:
 
-Rollback to latest version (index 0)
-Verifies content matches
-Rolls back to first version (index 2)
-Validates content restoration
+- Rollback to latest version (index 0)
+- Verifies content matches
+- Rolls back to first version (index 2)
+- Validates content restoration
 
 
 
