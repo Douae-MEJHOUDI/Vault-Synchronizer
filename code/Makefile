@@ -17,7 +17,9 @@ SOURCES = VaultManager.cpp \
           CommitManager.cpp \
           PrivilegeManager.cpp \
           RollBackManager.cpp \
-          imaneRolls.cpp
+          SyncManager.cpp \
+          FileMonitor.cpp \
+          test_comprehensive.cpp
 
 # Object files
 OBJECTS = $(SOURCES:.cpp=.o)
@@ -39,7 +41,7 @@ $(TARGET): $(OBJECTS)
 # Clean
 clean:
 	del /F /Q $(OBJECTS) $(TARGET).exe 2>nul
-	if exist test_vault rmdir /S /Q imaneRolls
+	if exist test_vault rmdir /S /Q test_comprehensive
 
 # Run tests
 test: $(TARGET)

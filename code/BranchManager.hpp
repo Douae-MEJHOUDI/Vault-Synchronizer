@@ -20,8 +20,6 @@ private:
     PrivilegeManager& privilegeManager;
     std::string currentBranch;
 
-
-    
     bool updateBranchHead(const std::string& branchName, const std::string& commitId);
 
 public:

@@ -159,4 +159,3 @@ std::map<std::string, std::string> BranchManager::getBranchState(const std::stri
     
     return state;
 }
-

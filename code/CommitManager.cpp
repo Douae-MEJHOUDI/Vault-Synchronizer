@@ -99,7 +99,10 @@ bool CommitManager::commit(const std::string& message) {
             if (!fileManager.storeFileContent(file, hash)) {
                 throw std::runtime_error("Failed to store file content: " + file);
             }
-            commit.fileHashes[file] = hash;
+            // Store relative path in commit
+            fs::path filePath(file);
+            std::string relativePath = filePath.filename().string();
+            commit.fileHashes[relativePath] = hash;
         }
 
         // Save commit information
