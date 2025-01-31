@@ -1,8 +1,4 @@
-//#include "RollbackManager.hpp"
-#include "FileManager.hpp"
-#include "CommitManager.hpp"
-#include "BranchManager.hpp"
-#include "PrivilegeManager.hpp"
+#include "RollbackManager.hpp"
 #include <stack>
 #include <iostream>
 #include <vector>
@@ -15,31 +11,19 @@
 #include <ctime>
 
 
-class RollbackManager {
-private:
-    struct CommitEntry {
-        std::string commitId;
-        std::string message;
-        std::time_t timestamp;
-        std::map<std::string, std::string> fileStates;
-    };
 
-    struct BranchState {
-        std::string headCommit;
-        std::set<std::string> trackedFiles;
-        std::map<std::string, std::string> fileStates;
-    };
-
-    FileManager& fileManager;
-    CommitManager& commitManager;
-    BranchManager& branchManager;
-    PrivilegeManager& privilegeManager;
-    std::stack<CommitEntry> forwardHistory;
-
-    
-
-    
-    CommitEntry getCurrentCommitState() {
+    RollbackManager::RollbackManager(FileManager& fm, CommitManager& cm, BranchManager& bm, PrivilegeManager& pm)
+        : fileManager(fm), commitManager(cm), branchManager(bm), privilegeManager(pm) {
+    try {
+        if (!fs::exists(fs::path(commitManager.getVaultPath()))) {
+            throw std::runtime_error("Vault path does not exist");
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Error initializing RollbackManager: " << e.what() << std::endl;
+        throw;
+    }
+}
+RollbackManager::CommitEntry RollbackManager::getCurrentCommitState() {
         /*
         Creates snapshot of current working directory
         Records file paths and their hashes
@@ -63,7 +47,7 @@ private:
         return current;
     }
 
-    bool applyCommitState(const CommitEntry& state) {
+    bool RollbackManager::applyCommitState(const CommitEntry& state) {
         if (!privilegeManager.isAuthorized("write")) {
             std::cerr << "Error: User does not have write permissions for rollback" << std::endl;
             return false;
@@ -72,7 +56,9 @@ private:
     try {
         auto currentState = loadBranchState(branchManager.getCurrentBranch());
         
-        // Create backups
+        /* Create backups 
+        This is like making a temporary photocopy of our current files before making any changes. If something goes wrong during the rollback, we can restore these backups.
+        */
         for (const auto& file : currentState.trackedFiles) {
             if (fileManager.fileExists(file)) {
                 std::string backupPath = file + ".backup";
@@ -98,9 +84,18 @@ private:
             }
         }
 
+        /*here we're doing two things:
+    Updating the branch's record of which files it's tracking and their states
+    Moving our HEAD bookmark to point to the historical commit*/
+
         // Update branch state
         if (!branchManager.saveBranchState(branchManager.getCurrentBranch(), state.fileStates)) {
             throw std::runtime_error("Failed to update branch state");
+        }
+
+        // Update HEAD to point to the commit we're rolling back to
+        if (!branchManager.switchBranch(branchManager.getCurrentBranch(), state.commitId)) {
+            throw std::runtime_error("Failed to update branch HEAD");
         }
 
         // Clean up backups
@@ -127,20 +122,10 @@ private:
     }
 }
 
-public:
-    RollbackManager(FileManager& fm, CommitManager& cm, BranchManager& bm, PrivilegeManager& pm)
-        : fileManager(fm), commitManager(cm), branchManager(bm), privilegeManager(pm) {
-    try {
-        if (!fs::exists(fs::path(commitManager.getVaultPath()))) {
-            throw std::runtime_error("Vault path does not exist");
-        }
-    } catch (const std::exception& e) {
-        std::cerr << "Error initializing RollbackManager: " << e.what() << std::endl;
-        throw;
-    }
-}
 
-    void displayCommitHistory() {
+
+
+    void RollbackManager::displayCommitHistory() {
         if (!privilegeManager.isAuthorized("read")) {
             std::cerr << "Error: User does not have read permissions to view history" << std::endl;
             return;
@@ -169,7 +154,7 @@ public:
     }
 }
 
-    bool rollbackToCommit(size_t index) {
+    bool RollbackManager::rollbackToCommit(size_t index) {
     if (!privilegeManager.isAuthorized("write")) {
         return false;
     }
@@ -187,29 +172,29 @@ public:
     return applyCommitState(commits[index]);
 }
 
-bool rollForward() {
+bool RollbackManager::rollForward() {
     if (!privilegeManager.isAuthorized("write")) {
             std::cerr << "Error: User does not have write permissions to perform roll forward" << std::endl;
             return false;
         }
     if (forwardHistory.empty()) {
         std::cerr << "No forward history available" << std::endl;
-        return false;
+        return false; // hna we have nothing to roll forward to
     }
 
-    auto state = forwardHistory.top();
-    forwardHistory.pop();
-    return applyCommitState(state);
+    auto state = forwardHistory.top(); // we get the most recent saved state
+    forwardHistory.pop();   // we remove it from the stack
+    return applyCommitState(state); // then we apply that state
 }
 
-    bool canRollForward() const {
+    bool RollbackManager::canRollForward() const {
         if (!privilegeManager.isAuthorized("read")) {
             return false;
         }
         return !forwardHistory.empty();
     }
 
-    void clearForwardHistory() {
+    void RollbackManager::clearForwardHistory() {
         if (!privilegeManager.isAuthorized("write")) {
             std::cerr << "Error: User does not have write permissions to clear history" << std::endl;
             return;
@@ -219,7 +204,7 @@ bool rollForward() {
         }
     }
 
-    std::vector<CommitEntry> getCommitsInBranch(const std::string& branchName) {
+    std::vector<RollbackManager::CommitEntry> RollbackManager::getCommitsInBranch(const std::string& branchName) {
          if (!privilegeManager.isAuthorized("read")) {
             std::cerr << "Error: User does not have read permissions to view commits" << std::endl;
             return {};
@@ -272,15 +257,14 @@ bool rollForward() {
     return commits;
 }
 
-private:
-    void saveToForwardHistory(const CommitEntry& commit) {
+    void RollbackManager::saveToForwardHistory(const CommitEntry& commit) {
         if (!privilegeManager.isAuthorized("write")) {
             throw std::runtime_error("User does not have write permissions to save history");
         }
         forwardHistory.push(commit);
     }
 
-    BranchState loadBranchState(const std::string& branchName) {
+    RollbackManager::BranchState RollbackManager::loadBranchState(const std::string& branchName) {
         /*
         Reads branch state from branch directory
         Loads tracked files and their current states
@@ -306,4 +290,3 @@ private:
 
         return state;
     }
-};

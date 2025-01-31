@@ -17,7 +17,7 @@ SOURCES = VaultManager.cpp \
           CommitManager.cpp \
           PrivilegeManager.cpp \
           RollBackManager.cpp \
-          test_milestones45.cpp
+          imaneRolls.cpp
 
 # Object files
 OBJECTS = $(SOURCES:.cpp=.o)
@@ -39,7 +39,7 @@ $(TARGET): $(OBJECTS)
 # Clean
 clean:
 	del /F /Q $(OBJECTS) $(TARGET).exe 2>nul
-	if exist test_vault rmdir /S /Q test_milestones45
+	if exist test_vault rmdir /S /Q imaneRolls
 
 # Run tests
 test: $(TARGET)
